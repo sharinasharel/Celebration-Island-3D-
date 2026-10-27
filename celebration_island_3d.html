@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Celebration Island 3D: Read, Explore & Celebrate!</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        /* CSS Variables for Accessibility Settings */
+        :root {
+            --font-size-base: 16px;
+            --font-size-lg: 20px;
+            --font-size-xl: 24px;
+            --font-size-2xl: 32px;
+            
+            --bg-color: #f0fdf4; /* Light green */
+            --text-color: #1f2937; /* Dark gray */
+            --modal-bg: #ffffff;
+            --btn-primary: #3b82f6;
+            --btn-text: #ffffff;
+        }
+
+        /* High Contrast Theme */
+        body.theme-high-contrast {
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --modal-bg: #111111;
+            --btn-primary: #ffff00;
+            --btn-text: #000000;
+        }
+
+        /* Text Size Settings */
+        body.text-size-sm { font-size: var(--font-size-base); }
+        body.text-size-md { font-size: var(--font-size-lg); }
+        body.text-size-lg { font-size: var(--font-size-xl); }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            touch-action: none; /* Prevent pinch zoom on mobile */
+        }
+
+        /* Game Container */
+        #game-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            display: none; /* Hidden by default until 3D is launched */
+        }
+
+        /* UI Layer */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none; /* Let clicks pass through to 3D when empty */
+        }
+
+        /* Modals and Screens */
+        .screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            box-sizing: border-box;
+            overflow-y: auto;
+            pointer-events: auto; /* Catch clicks for UI */
+        }
+
+        .active-screen {
+            display: flex;
+        }
+
+        /* Overlay Modals (HUD, Quiz) */
+        .modal-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 50;
+            padding: 1rem;
+        }
+
+        .modal-content {
+            background-color: var(--modal-bg);
+            color: var(--text-color);
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border: 4px solid var(--btn-primary);
+        }
+
+        /* Accessible Buttons */
+        .btn {
+            background-color: var(--btn-primary);
+            color: var(--btn-text);
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s, filter 0.1s;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .btn:hover, .btn:focus {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+            outline: 4px solid #f59e0b; /* Visible focus indicator */
+            outline-offset: 2px;
+        }
+        .btn-large {
+            font-size: 1.25em;
+            padding: 1.5rem 3rem;
+            width: 100%;
+            max-width: 400px;
+            margin: 0.5rem;
+        }
+        .btn-answer {
+            width: 100%;
+            text-align: left;
+            margin-bottom: 1rem;
+            font-size: 1.1em;
+            background-color: #e5e7eb;
+            color: #1f2937;
+            border: 2px solid #9ca3af;
+        }
+        body.theme-high-contrast .btn-answer {
+            background-color: #333;
+            color: #fff;
+            border-color: #fff;
+        }
+        .btn-answer:hover, .btn-answer:focus {
+            background-color: #d1d5db;
+            outline: 4px solid var(--btn-primary);
+        }
+        body.theme-high-contrast .btn-answer:hover {
+            background-color: #555;
+        }
+
+        /* HUD elements */
+        #hud {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: none;
+            z-index: 20;
+        }
+        .hud-top {
+            position: absolute;
+            top: 10px; left: 10px; right: 10px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: auto;
+        }
+        .hud-panel {
+            background: var(--modal-bg);
+            color: var(--text-color);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: 2px solid var(--btn-primary);
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* On-Screen Controls for Touch */
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            pointer-events: auto;
+            display: none; /* Shown via JS if touch or always on */
+        }
+        .d-pad {
+            display: grid;
+            grid-template-columns: 60px 60px 60px;
+            grid-template-rows: 60px 60px 60px;
+            gap: 5px;
+        }
+        .d-btn {
+            background: rgba(255,255,255,0.7);
+            border: 2px solid #333;
+            border-radius: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            user-select: none;
+        }
+        .d-btn:active { background: rgba(200,200,200,0.9); }
+        #btn-up { grid-column: 2; grid-row: 1; }
+        #btn-left { grid-column: 1; grid-row: 2; }
+        #btn-down { grid-column: 2; grid-row: 2; }
+        #btn-right { grid-column: 3; grid-row: 2; }
+
+        #action-btn-container {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            pointer-events: auto;
+            display: none; /* Shown when near an object */
+        }
+        #btn-interact {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: #ef4444;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+            border: 4px solid #b91c1c;
+            box-shadow: 0 4px 0 #991b1b;
+        }
+        #btn-interact:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        /* Helper Classes */
+        .text-center { text-align: center; }
+        .mt-4 { margin-top: 1rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .flex-col { display: flex; flex-direction: column; }
+        .gap-4 { gap: 1rem; }
+        .w-full { width: 100%; }
+        
+        /* Grid for level select */
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 1200px;
+            padding: 1rem;
+        }
+        .level-card {
+            background: var(--modal-bg);
+            border: 4px solid var(--btn-primary);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .level-icon { font-size: 4rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body class="text-size-md">
+
+    <!-- 3D Canvas Container -->
+    <div id="game-container"></div>
+
+    <!-- UI Layer -->
+    <div id="ui-layer">
+        
+        <!-- Main Menu -->
+        <div id="screen-main" class="screen active-screen">
+            <h1 class="text-4xl md:text-6xl font-extrabold text-center mb-2 text-blue-600 drop-shadow-md" style="color: var(--btn-primary);">CELEBRATION ISLAND 3D</h1>
+            <h2 class="text-2xl mb-8 font-bold text-center">Read, Explore & Celebrate!</h2>
+            
+            <div class="flex-col gap-4 w-full max-w-md items-center flex">
+                <button class="btn btn-large" onclick="startGame(true)">🎮 PLAY 3D ADVENTURE</button>
+                <button class="btn btn-large" onclick="showScreen('screen-level-select')">⚡ QUICK ACCESS</button>
+                <button class="btn btn-large bg-purple-500" onclick="showScreen('screen-progress')">⭐ MY PROGRESS</button>
+                <button class="btn btn-large bg-gray-500" onclick="showScreen('screen-settings')">⚙️ ACCESSIBILITY SETTINGS</button>
+                <button class="btn btn-large bg-green-500" onclick="showScreen('screen-help')">❓ HOW TO PLAY</button>
+            </div>
+        </div>
+
+        <!-- Level Select / Quick Access Menu -->
+        <div id="screen-level-select" class="screen">
+            <div class="flex justify-between w-full max-w-6xl mb-6">
+                <h2 class="text-3xl font-bold">Choose a Challenge</h2>
+                <button class="btn bg-gray-500" onclick="showScreen('screen-main')">BACK TO MENU</button>
+            </div>
+            
+            <div class="level-grid" id="level-cards-container">
+                <!-- Cards injected via JS -->
+            </div>
+        </div>
+
+        <!-- Accessibility Settings -->
+        <div id="screen-settings" class="screen">
+            <div class="w-full max-w-2xl bg-white p-8 rounded-xl border-4 border-blue-500 flex flex-col gap-6" style="background: var(--modal-bg);">
+                <h2 class="text-3xl font-bold text-center border-b-2 pb-4">Accessibility Settings</h2>
+                
+                <div>
+                    <h3 class="text-xl font-bold mb-2">Text Size</h3>
+                    <div class="flex gap-4">
+                        <button class="btn flex-1" onclick="setTextSize('sm')">Small</button>
+                        <button class="btn flex-1" onclick="setTextSize('md')">Medium</button>
+                        <button class="btn flex-1" onclick="setTextSize('lg')">Large</button>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-xl font-bold mb-2">Visuals</h3>
+                    <button class="btn w-full" id="btn-contrast" onclick="toggleContrast()">Toggle High Contrast Mode</button>
+                </div>
+
+                <div>
+                    <h3 class="text-xl font-bold mb-2">Audio</h3>
+                    <button class="btn w-full" id="btn-sound" onclick="toggleSound()">Sound: ON</button>
+                </div>
+
+                <div class="mt-4 flex justify-center">
+                    <button class="btn bg-green-600 btn-large" onclick="showScreen('screen-main')">SAVE & RETURN</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- How To Play -->
+        <div id="screen-help" class="screen">
+            <div class="w-full max-w-3xl bg-white p-8 rounded-xl border-4 border-blue-500" style="background: var(--modal-bg);">
+                <h2 class="text-3xl font-bold mb-6 text-center">How To Play</h2>
+                
+                <div class="text-lg space-y-4 mb-8">
+                    <p><strong>3D Adventure:</strong> Use the <strong>Arrow Keys</strong> or <strong>W, A, S, D</strong> to walk around Celebration Island. You can also use the on-screen buttons.</p>
+                    <p>When you see a big colourful station, walk close to it and press the <strong>INTERACT</strong> button.</p>
+                    <p><strong>Quick Access:</strong> Skip the walking and choose a level straight from the menu!</p>
+                    <p><strong>Reading Challenges:</strong></p>
+                    <ul class="list-disc pl-8">
+                        <li>Read the short passage carefully.</li>
+                        <li>Answer 3 questions about the text.</li>
+                        <li>Earn stars for correct answers! If you make a mistake, don't worry, you can try again.</li>
+                    </ul>
+                </div>
+
+                <div class="flex justify-center">
+                    <button class="btn btn-large" onclick="showScreen('screen-main')">UNDERSTOOD</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Dashboard -->
+        <div id="screen-progress" class="screen">
+            <div class="w-full max-w-3xl bg-white p-8 rounded-xl border-4 border-purple-500 flex flex-col items-center" style="background: var(--modal-bg);">
+                <h2 class="text-4xl font-bold mb-6 text-center text-purple-600">My Progress Dashboard</h2>
+                
+                <div class="text-6xl mb-4">⭐ <span id="dash-stars">0</span>/12 Stars</div>
+                <p class="text-xl mb-8">Answer questions correctly to earn stars!</p>
+
+                <div class="w-full grid grid-cols-2 gap-4 mb-8 text-center text-lg font-bold">
+                    <div class="p-4 border-2 rounded bg-gray-100" style="color: #333;">Levels Completed: <span id="dash-levels">0</span>/4</div>
+                    <div class="p-4 border-2 rounded bg-gray-100" style="color: #333;">Questions Right: <span id="dash-questions">0</span></div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-4 w-full justify-center">
+                    <button class="btn btn-large bg-green-600" onclick="openSaveModal()">☁️ SAVE TO GOOGLE SHEETS</button>
+                    <button class="btn btn-large bg-gray-500" onclick="showScreen('screen-main')">BACK TO MENU</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Heads Up Display (HUD) for 3D Mode -->
+        <div id="hud">
+            <div class="hud-top">
+                <button class="btn bg-gray-600 px-4 py-2" onclick="exit3DMode()">☰ MENU</button>
+                <div class="hud-panel">⭐ <span id="hud-stars">0</span>/12</div>
+            </div>
+            
+            <div id="controls">
+                <div class="d-pad">
+                    <button class="d-btn" id="btn-up">↑</button>
+                    <button class="d-btn" id="btn-left">←</button>
+                    <button class="d-btn" id="btn-down">↓</button>
+                    <button class="d-btn" id="btn-right">→</button>
+                </div>
+            </div>
+
+            <div id="action-btn-container">
+                <button id="btn-interact" onclick="triggerCurrentStation()">INTERACT</button>
+            </div>
+            
+            <div id="instruction-toast" class="absolute top-20 w-full flex justify-center pointer-events-none opacity-0 transition-opacity duration-500">
+                <div class="hud-panel bg-yellow-100 border-yellow-500 text-black text-center max-w-md">
+                    Use Arrow Keys or WASD to move. Find a level station!
+                </div>
+            </div>
+        </div>
+
+        <!-- Quiz / Reading Modal -->
+        <div id="modal-quiz" class="modal-overlay">
+            <div class="modal-content flex flex-col items-center relative">
+                <button class="absolute top-4 right-4 text-gray-500 font-bold text-xl hover:text-red-500" aria-label="Close" onclick="closeQuizModal()">✕</button>
+                
+                <h2 id="quiz-title" class="text-3xl font-bold mb-4 text-center">Level Title</h2>
+                
+                <!-- State 1: Reading Passage -->
+                <div id="quiz-state-reading" class="w-full flex flex-col items-center">
+                    <div class="bg-blue-50 p-6 rounded-lg border-2 border-blue-200 mb-6 w-full text-lg leading-relaxed" style="color: #1f2937;" id="quiz-passage">
+                        Passage goes here...
+                    </div>
+                    <button class="btn btn-large bg-green-500" onclick="startQuestions()">I'M READY TO ANSWER</button>
+                </div>
+
+                <!-- State 2: Questions -->
+                <div id="quiz-state-questions" class="w-full flex flex-col items-center hidden">
+                    <div class="font-bold text-lg mb-2">Question <span id="q-num">1</span> of 3</div>
+                    <div class="text-xl mb-6 text-center font-bold" id="q-text">Question text?</div>
+                    
+                    <div class="w-full flex flex-col gap-3" id="q-options">
+                        <!-- Options injected here -->
+                    </div>
+                </div>
+
+                <!-- State 3: Feedback Message -->
+                <div id="quiz-state-feedback" class="w-full flex flex-col items-center hidden py-8">
+                    <div id="feedback-icon" class="text-6xl mb-4">✅</div>
+                    <h3 id="feedback-title" class="text-2xl font-bold mb-2">Excellent!</h3>
+                    <p id="feedback-text" class="text-lg mb-8 text-center">You found the answer in the text!</p>
+                    <button id="btn-next-action" class="btn btn-large" onclick="handleNextAction()">NEXT</button>
+                </div>
+                
+                <!-- State 4: Level Complete -->
+                <div id="quiz-state-complete" class="w-full flex flex-col items-center hidden py-8">
+                    <div class="text-6xl mb-4">🏆</div>
+                    <h3 class="text-3xl font-bold mb-2 text-center">Level Complete!</h3>
+                    <p class="text-lg mb-6 text-center" id="complete-msg">Great job reading and exploring!</p>
+                    <div class="text-2xl font-bold mb-8 text-yellow-500" id="complete-stars">⭐⭐⭐</div>
+                    
+                    <div class="flex flex-col gap-4 w-full max-w-sm">
+                        <button class="btn bg-blue-500 w-full" onclick="closeQuizModal()">CONTINUE EXPLORING</button>
+                        <button class="btn bg-gray-500 w-full" onclick="returnToMenuFromQuiz()">LEVEL MENU</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Google Sheets Save Modal -->
+        <div id="modal-save" class="modal-overlay">
+            <div class="modal-content flex flex-col items-center relative" style="max-width: 500px;">
+                <button class="absolute top-4 right-4 text-gray-500 font-bold text-xl hover:text-red-500" aria-label="Close" onclick="closeSaveModal()">✕</button>
+                <h2 class="text-3xl font-bold mb-4 text-center text-green-600">Save Progress</h2>
+                <p class="text-center mb-6">Send your results directly to your teacher's Google Sheet.</p>
+                
+                <div class="w-full flex flex-col gap-4 mb-6 text-left">
+                    <div>
+                        <label class="font-bold mb-1 block text-lg">Student Name:</label>
+                        <input type="text" id="student-name" class="w-full p-3 border-2 border-gray-300 rounded text-black" placeholder="Enter your name">
+                    </div>
+                    <div>
+                        <label class="font-bold mb-1 block text-lg">Teacher's Google Script URL:</label>
+                        <input type="password" id="script-url" class="w-full p-3 border-2 border-gray-300 rounded text-black" placeholder="https://script.google.com/macros/s/...">
+                    </div>
+                    <div id="save-status" class="text-center h-8 flex items-center justify-center text-lg"></div>
+                </div>
+
+                <button id="btn-submit-sheet" class="btn btn-large bg-green-600 w-full" onclick="submitToGoogleSheets()">SAVE RESULTS</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- GAME LOGIC -->
+    <script>
+        // --- 1. GAME DATA ---
+        const levelData = [
+            {
+                id: 1,
+                title: "BALLOON BOULEVARD",
+                icon: "🎈",
+                desc: "Mia's Birthday Party. Read about her celebration!",
+                color: 0xff99bb, // Pinkish
+                position: { x: -25, z: -25 },
+                passage: "Mia is having a birthday party on Saturday. She invites her friends to her house. They will play games, eat fruit salad, and sing a birthday song. Mia is excited to celebrate with her friends.",
+                questions: [
+                    { q: "When is Mia’s birthday party?", options: ["Monday", "Saturday", "Wednesday", "Sunday"], answer: 1, explanation: "The text says 'Mia is having a birthday party on Saturday'." },
+                    { q: "Where will Mia celebrate her birthday?", options: ["At school", "At the park", "At her house", "At the library"], answer: 2, explanation: "The text says 'She invites her friends to her house'." },
+                    { q: "What will Mia and her friends eat?", options: ["Fruit salad", "Soup", "Noodles", "Bread"], answer: 0, explanation: "The text says they will 'eat fruit salad'." }
+                ]
+            },
+            {
+                id: 2,
+                title: "PICNIC PARK",
+                icon: "🧺",
+                desc: "A sunny class picnic. Keep the park clean!",
+                color: 0x66cc66, // Green
+                position: { x: 25, z: -25 },
+                passage: "Amir and his classmates have a picnic in the park. Amir brings apples, sandwiches, and a bottle of water. His friend Sara brings bananas. They put their rubbish in the bin to keep the park clean.",
+                questions: [
+                    { q: "Where do the pupils have their picnic?", options: ["At the beach", "In the park", "In the classroom", "At the market"], answer: 1, explanation: "The text says they 'have a picnic in the park'." },
+                    { q: "What does Amir bring to drink?", options: ["Milk", "Juice", "Water", "Tea"], answer: 2, explanation: "The text says Amir brings 'a bottle of water'." },
+                    { q: "Why do the pupils put rubbish in the bin?", options: ["To keep the park clean", "To feed the birds", "To decorate the park", "To play a game"], answer: 0, explanation: "The text says they put rubbish in the bin 'to keep the park clean'." }
+                ]
+            },
+            {
+                id: 3,
+                title: "FESTIVAL SQUARE",
+                icon: "🏮",
+                desc: "School Celebration Day with music and dance.",
+                color: 0xffcc00, // Yellow/Gold
+                position: { x: -25, z: 25 },
+                passage: "You are invited to School Celebration Day on Friday. The event starts at 9 a.m. Pupils can enjoy music, traditional dances, and art activities. Pupils may wear traditional clothes. Remember to bring your water bottle.",
+                questions: [
+                    { q: "When is School Celebration Day?", options: ["Friday", "Tuesday", "Sunday", "Monday"], answer: 0, explanation: "The text says 'School Celebration Day on Friday'." },
+                    { q: "What time does the event start?", options: ["7 a.m.", "8 a.m.", "9 a.m.", "12 p.m."], answer: 2, explanation: "The text says 'The event starts at 9 a.m.'." },
+                    { q: "What should pupils remember to bring?", options: ["A football", "A water bottle", "A pillow", "A toy car"], answer: 1, explanation: "The text reminds pupils to 'bring your water bottle'." }
+                ]
+            },
+            {
+                id: 4,
+                title: "CAKE CASTLE",
+                icon: "🏰",
+                desc: "Working together to decorate the celebration hall.",
+                color: 0x99ccff, // Light blue
+                position: { x: 25, z: 25 },
+                passage: "The pupils work together to prepare the celebration hall. Sara hangs paper stars. Ben arranges the chairs. Hana makes a welcome sign. Their teacher thanks everyone for helping. The hall looks beautiful because everyone works as a team.",
+                questions: [
+                    { q: "What does Sara hang?", options: ["Paper stars", "School bags", "Balloons made of glass", "Books"], answer: 0, explanation: "The text says 'Sara hangs paper stars'." },
+                    { q: "What does Ben arrange?", options: ["Cakes", "Chairs", "Shoes", "Flowers"], answer: 1, explanation: "The text says 'Ben arranges the chairs'." },
+                    { q: "What is the main idea of the story?", options: ["The pupils work together.", "The pupils go home early.", "The hall is empty.", "The teacher cancels the celebration."], answer: 0, explanation: "The story shows everyone doing a task and says 'everyone works as a team'." }
+                ]
+            }
+        ];
+
+        // --- 2. STATE MANAGEMENT ---
+        let gameState = {
+            stars: { 1: [false,false,false], 2: [false,false,false], 3: [false,false,false], 4: [false,false,false] },
+            settings: { textSize: 'md', highContrast: false, sound: true },
+            in3DMode: false,
+            currentLevelId: null,
+            currentQuestionIndex: 0,
+            activeStationObj: null
+        };
+
+        // Audio Context (Simple synthesized sounds to avoid loading external assets)
+        let audioCtx = null;
+        function playSound(type) {
+            if (!gameState.settings.sound) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                if (type === 'correct') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                    osc.frequency.setValueAtTime(660, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+                } else if (type === 'wrong') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                    osc.frequency.setValueAtTime(200, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+                } else if (type === 'star') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+                    osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
+                    osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+                }
+            } catch(e) { console.log("Audio skipped", e); }
+        }
+
+        // --- 3. UI CONTROLLERS ---
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
+            document.getElementById(screenId).classList.add('active-screen');
+            updateDashboard();
+        }
+
+        function startGame(is3D) {
+            gameState.in3DMode = is3D;
+            if (is3D) {
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
+                document.getElementById('game-container').style.display = 'block';
+                document.getElementById('hud').style.display = 'block';
+                
+                // Show D-pad if on touch device (simple heuristic)
+                if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                    document.getElementById('controls').style.display = 'block';
+                } else {
+                    // Show keyboard hint
+                    const toast = document.getElementById('instruction-toast');
+                    toast.classList.remove('opacity-0');
+                    setTimeout(() => toast.classList.add('opacity-0'), 5000);
+                }
+
+                init3D();
+            }
+        }
+
+        function exit3DMode() {
+            gameState.in3DMode = false;
+            document.getElementById('game-container').style.display = 'none';
+            document.getElementById('hud').style.display = 'none';
+            showScreen('screen-main');
+        }
+
+        function populateLevelMenu() {
+            const container = document.getElementById('level-cards-container');
+            container.innerHTML = '';
+            levelData.forEach(lvl => {
+                const card = document.createElement('div');
+                card.className = 'level-card';
+                card.innerHTML = `
+                    <div class="level-icon" aria-hidden="true">${lvl.icon}</div>
+                    <h3 class="text-xl font-bold mb-2 uppercase">${lvl.title}</h3>
+                    <p class="mb-4 flex-grow">${lvl.desc}</p>
+                    <button class="btn w-full bg-blue-500" onclick="startLevelQuiz(${lvl.id})" aria-label="Play Level ${lvl.id}: ${lvl.title}">▶ PLAY LEVEL</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function updateDashboard() {
+            let totalStars = 0;
+            let questionsRight = 0;
+            let levelsComplete = 0;
+
+            for (let i = 1; i <= 4; i++) {
+                let lvlStars = gameState.stars[i].filter(s => s).length;
+                totalStars += lvlStars;
+                questionsRight += lvlStars;
+                if (lvlStars === 3) levelsComplete++;
+            }
+
+            document.getElementById('dash-stars').innerText = totalStars;
+            document.getElementById('dash-questions').innerText = questionsRight;
+            document.getElementById('dash-levels').innerText = levelsComplete;
+            document.getElementById('dash-questions').innerText = questionsRight;
+            document.getElementById('hud-stars').innerText = totalStars;
+        }
+
+        // Google Sheets Integration Functions
+        function openSaveModal() {
+            document.getElementById('modal-save').style.display = 'flex';
+            document.getElementById('save-status').innerHTML = '';
+        }
+
+        function closeSaveModal() {
+            document.getElementById('modal-save').style.display = 'none';
+        }
+
+        async function submitToGoogleSheets() {
+            const studentName = document.getElementById('student-name').value.trim();
+            const scriptUrl = document.getElementById('script-url').value.trim();
+            const statusEl = document.getElementById('save-status');
+            const btn = document.getElementById('btn-submit-sheet');
+            
+            if (!studentName || !scriptUrl) {
+                statusEl.innerHTML = '<span class="text-red-500 font-bold">⚠️ Please fill in both fields.</span>';
+                return;
+            }
+
+            btn.innerText = 'SAVING...';
+            btn.disabled = true;
+            statusEl.innerHTML = '<span class="text-blue-500 font-bold">Connecting to Google Sheets...</span>';
+
+            // Calculate current progress
+            let totalStars = 0, questionsRight = 0, levelsComplete = 0;
+            let lvlStars = {};
+            for (let i = 1; i <= 4; i++) {
+                let s = gameState.stars[i].filter(x => x).length;
+                lvlStars['level' + i] = s;
+                totalStars += s;
+                questionsRight += s;
+                if (s === 3) levelsComplete++;
+            }
+
+            const payload = {
+                studentName: studentName,
+                totalStars: totalStars,
+                questionsRight: questionsRight,
+                levelsCompleted: levelsComplete,
+                level1Stars: lvlStars.level1,
+                level2Stars: lvlStars.level2,
+                level3Stars: lvlStars.level3,
+                level4Stars: lvlStars.level4
+            };
+
+            try {
+                // Using mode: 'no-cors' allows sending data to Google Apps Script without preflight errors
+                await fetch(scriptUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
+                
+                statusEl.innerHTML = '<span class="text-green-500 font-bold">✅ Saved successfully!</span>';
+                
+                setTimeout(() => {
+                    closeSaveModal();
+                    btn.innerText = 'SAVE RESULTS';
+                    btn.disabled = false;
+                }, 2000);
+            } catch (error) {
+                statusEl.innerHTML = '<span class="text-red-500 font-bold">❌ Error. Check your connection or URL.</span>';
+                btn.innerText = 'TRY AGAIN';
+                btn.disabled = false;
+            }
+        }
+
+        // Accessibility Settings Functions
+        function setTextSize(size) {
+            gameState.settings.textSize = size;
+            document.body.className = document.body.className.replace(/text-size-\w+/, '');
+            document.body.classList.add(`text-size-${size}`);
+        }
+
+        function toggleContrast() {
+            gameState.settings.highContrast = !gameState.settings.highContrast;
+            if (gameState.settings.highContrast) {
+                document.body.classList.add('theme-high-contrast');
+            } else {
+                document.body.classList.remove('theme-high-contrast');
+            }
+        }
+
+        function toggleSound() {
+            gameState.settings.sound = !gameState.settings.sound;
+            document.getElementById('btn-sound').innerText = `Sound: ${gameState.settings.sound ? 'ON' : 'OFF'}`;
+        }
+
+        // --- 4. QUIZ LOGIC ---
+        function startLevelQuiz(levelId) {
+            gameState.currentLevelId = levelId;
+            gameState.currentQuestionIndex = 0;
+            const lvl = levelData.find(l => l.id === levelId);
+            
+            document.getElementById('quiz-title').innerText = `${lvl.title}`;
+            document.getElementById('quiz-passage').innerText = lvl.passage;
+            
+            document.getElementById('quiz-state-reading').classList.remove('hidden');
+            document.getElementById('quiz-state-questions').classList.add('hidden');
+            document.getElementById('quiz-state-feedback').classList.add('hidden');
+            document.getElementById('quiz-state-complete').classList.add('hidden');
+            
+            document.getElementById('modal-quiz').style.display = 'flex';
+        }
+
+        function startQuestions() {
+            document.getElementById('quiz-state-reading').classList.add('hidden');
+            document.getElementById('quiz-state-questions').classList.remove('hidden');
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            const lvl = levelData.find(l => l.id === gameState.currentLevelId);
+            const qData = lvl.questions[gameState.currentQuestionIndex];
+            
+            document.getElementById('q-num').innerText = gameState.currentQuestionIndex + 1;
+            document.getElementById('q-text').innerText = qData.q;
+            
+            const optionsContainer = document.getElementById('q-options');
+            optionsContainer.innerHTML = '';
+            
+            qData.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-answer';
+                btn.innerText = `${String.fromCharCode(65 + index)}. ${opt}`;
+                btn.onclick = () => checkAnswer(index);
+                optionsContainer.appendChild(btn);
+            });
+            
+            // Set focus to the first option for accessibility
+            setTimeout(() => {
+                if(optionsContainer.firstChild) optionsContainer.firstChild.focus();
+            }, 100);
+        }
+
+        function checkAnswer(selectedIndex) {
+            const lvl = levelData.find(l => l.id === gameState.currentLevelId);
+            const qData = lvl.questions[gameState.currentQuestionIndex];
+            
+            document.getElementById('quiz-state-questions').classList.add('hidden');
+            document.getElementById('quiz-state-feedback').classList.remove('hidden');
+            
+            const btnNext = document.getElementById('btn-next-action');
+            
+            if (selectedIndex === qData.answer) {
+                // Correct
+                playSound('correct');
+                document.getElementById('feedback-icon').innerText = '✅';
+                document.getElementById('feedback-title').innerText = 'Excellent!';
+                document.getElementById('feedback-title').style.color = '#16a34a';
+                document.getElementById('feedback-text').innerText = qData.explanation;
+                
+                // Award star if not already awarded
+                if (!gameState.stars[lvl.id][gameState.currentQuestionIndex]) {
+                    gameState.stars[lvl.id][gameState.currentQuestionIndex] = true;
+                    updateDashboard();
+                }
+                
+                btnNext.innerText = (gameState.currentQuestionIndex === 2) ? 'FINISH LEVEL' : 'NEXT QUESTION';
+                btnNext.onclick = () => {
+                    gameState.currentQuestionIndex++;
+                    if (gameState.currentQuestionIndex > 2) {
+                        showLevelComplete();
+                    } else {
+                        document.getElementById('quiz-state-feedback').classList.add('hidden');
+                        document.getElementById('quiz-state-questions').classList.remove('hidden');
+                        renderQuestion();
+                    }
+                };
+            } else {
+                // Incorrect
+                playSound('wrong');
+                document.getElementById('feedback-icon').innerText = '💡';
+                document.getElementById('feedback-title').innerText = 'Good try!';
+                document.getElementById('feedback-title').style.color = '#ea580c';
+                document.getElementById('feedback-text').innerText = "Read the passage carefully and look for a clue. You can do it!";
+                
+                btnNext.innerText = 'TRY AGAIN';
+                btnNext.onclick = () => {
+                    document.getElementById('quiz-state-feedback').classList.add('hidden');
+                    document.getElementById('quiz-state-questions').classList.remove('hidden');
+                    // Re-render to focus first option
+                    renderQuestion();
+                };
+            }
+        }
+
+        function showLevelComplete() {
+            playSound('star');
+            document.getElementById('quiz-state-feedback').classList.add('hidden');
+            document.getElementById('quiz-state-complete').classList.remove('hidden');
+            
+            const lvlStars = gameState.stars[gameState.currentLevelId];
+            const earned = lvlStars.filter(s => s).length;
+            
+            let starStr = '';
+            for(let i=0; i<3; i++) starStr += (i < earned) ? '⭐' : '⬛';
+            document.getElementById('complete-stars').innerText = starStr;
+        }
+
+        function closeQuizModal() {
+            document.getElementById('modal-quiz').style.display = 'none';
+        }
+
+        function returnToMenuFromQuiz() {
+            closeQuizModal();
+            exit3DMode();
+            showScreen('screen-level-select');
+        }
+
+        // --- 5. THREE.JS 3D WORLD ---
+        let scene, camera, renderer;
+        let player, playerSpeed = 0.3;
+        let keys = { w: false, a: false, s: false, d: false, up: false, down: false, left: false, right: false };
+        let stations = [];
+        let is3DInitialized = false;
+
+        function init3D() {
+            if (is3DInitialized) {
+                // Just resize and resume if already initialized
+                resize3D();
+                return;
+            }
+            
+            const container = document.getElementById('game-container');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB); // Sky blue
+            // Simple fog
+            scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(20, 40, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.camera.left = -50;
+            dirLight.shadow.camera.right = 50;
+            dirLight.shadow.camera.top = 50;
+            dirLight.shadow.camera.bottom = -50;
+            scene.add(dirLight);
+
+            // Ground (Grass)
+            const groundGeo = new THREE.PlaneGeometry(200, 200);
+            const groundMat = new THREE.MeshLambertMaterial({ color: 0x7cfc00 }); // Lawn green
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Central Path/Hub marker
+            const centerPathGeo = new THREE.BoxGeometry(20, 0.2, 20);
+            const centerPathMat = new THREE.MeshLambertMaterial({ color: 0xeeeeee });
+            const centerPath = new THREE.Mesh(centerPathGeo, centerPathMat);
+            centerPath.position.y = 0.1;
+            centerPath.receiveShadow = true;
+            scene.add(centerPath);
+
+            // Create Player (Blocky Character)
+            const playerGroup = new THREE.Group();
+            
+            const bodyGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+            const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3b82f6 }); // Blue
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.75;
+            body.castShadow = true;
+            playerGroup.add(body);
+
+            const headGeo = new THREE.BoxGeometry(1, 1, 1);
+            const headMat = new THREE.MeshLambertMaterial({ color: 0xffe4c4 }); // Skin tone
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 2;
+            head.castShadow = true;
+            playerGroup.add(head);
+            
+            scene.add(playerGroup);
+            player = playerGroup;
+            player.position.set(0, 0, 0);
+
+            // Build Level Stations
+            buildLevelStations();
+            buildDecorations();
+
+            // Camera initial setup
+            updateCamera();
+
+            // Controls setup
+            setupControls();
+
+            window.addEventListener('resize', resize3D);
+
+            is3DInitialized = true;
+            animate();
+        }
+
+        function buildLevelStations() {
+            levelData.forEach((lvl) => {
+                // Station Base
+                const baseGeo = new THREE.BoxGeometry(6, 1, 6);
+                const baseMat = new THREE.MeshLambertMaterial({ color: lvl.color });
+                const base = new THREE.Mesh(baseGeo, baseMat);
+                base.position.set(lvl.position.x, 0.5, lvl.position.z);
+                base.castShadow = true;
+                base.receiveShadow = true;
+                scene.add(base);
+
+                // Pillar/Marker
+                const pillarGeo = new THREE.BoxGeometry(2, 4, 2);
+                const pillarMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+                const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+                pillar.position.set(lvl.position.x, 3, lvl.position.z);
+                pillar.castShadow = true;
+                scene.add(pillar);
+
+                // Add to interactable list
+                stations.push({
+                    id: lvl.id,
+                    mesh: base,
+                    x: lvl.position.x,
+                    z: lvl.position.z,
+                    radius: 8 // interaction distance
+                });
+
+                // Pathway from center to station
+                const pathGeo = new THREE.BoxGeometry(4, 0.1, 20);
+                const pathMat = new THREE.MeshLambertMaterial({ color: 0xd2b48c }); // Tan path
+                const path = new THREE.Mesh(pathGeo, pathMat);
+                
+                // Position path halfway between center and station
+                path.position.set(lvl.position.x/2, 0.1, lvl.position.z/2);
+                path.lookAt(lvl.position.x, 0.1, lvl.position.z);
+                scene.add(path);
+            });
+        }
+
+        function buildDecorations() {
+            // Add some simple blocky trees/decorations around
+            const treeGeo = new THREE.BoxGeometry(1, 4, 1);
+            const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+            const leavesGeo = new THREE.BoxGeometry(3, 3, 3);
+            const leavesMat = new THREE.MeshLambertMaterial({ color: 0x228b22 });
+
+            for(let i=0; i<20; i++) {
+                const tx = (Math.random() - 0.5) * 80;
+                const tz = (Math.random() - 0.5) * 80;
+                
+                // Keep center clear
+                if(Math.abs(tx) < 15 && Math.abs(tz) < 15) continue;
+
+                const tree = new THREE.Group();
+                const trunk = new THREE.Mesh(treeGeo, trunkMat);
+                trunk.position.y = 2;
+                trunk.castShadow = true;
+                const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+                leaves.position.y = 4.5;
+                leaves.castShadow = true;
+                
+                tree.add(trunk);
+                tree.add(leaves);
+                tree.position.set(tx, 0, tz);
+                scene.add(tree);
+            }
+        }
+
+        function updateCamera() {
+            if(!camera || !player) return;
+            // Fixed isometric-ish follow camera
+            camera.position.x = player.position.x;
+            camera.position.y = player.position.y + 15;
+            camera.position.z = player.position.z + 20;
+            camera.lookAt(player.position);
+        }
+
+        function setupControls() {
+            // Keyboard
+            document.addEventListener('keydown', (e) => {
+                if(!gameState.in3DMode) return;
+                const k = e.key.toLowerCase();
+                if(k === 'w' || e.key === 'ArrowUp') keys.w = true;
+                if(k === 's' || e.key === 'ArrowDown') keys.s = true;
+                if(k === 'a' || e.key === 'ArrowLeft') keys.a = true;
+                if(k === 'd' || e.key === 'ArrowRight') keys.d = true;
+                
+                // Keyboard shortcut for interaction if close enough
+                if(e.key === 'e' || e.key === 'Enter') triggerCurrentStation();
+            });
+
+            document.addEventListener('keyup', (e) => {
+                if(!gameState.in3DMode) return;
+                const k = e.key.toLowerCase();
+                if(k === 'w' || e.key === 'ArrowUp') keys.w = false;
+                if(k === 's' || e.key === 'ArrowDown') keys.s = false;
+                if(k === 'a' || e.key === 'ArrowLeft') keys.a = false;
+                if(k === 'd' || e.key === 'ArrowRight') keys.d = false;
+            });
+
+            // Touch D-Pad
+            const dpad = [
+                {id: 'btn-up', key: 'w'},
+                {id: 'btn-down', key: 's'},
+                {id: 'btn-left', key: 'a'},
+                {id: 'btn-right', key: 'd'}
+            ];
+
+            dpad.forEach(btn => {
+                const el = document.getElementById(btn.id);
+                if(el) {
+                    el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[btn.key] = true; });
+                    el.addEventListener('touchend', (e) => { e.preventDefault(); keys[btn.key] = false; });
+                    el.addEventListener('mousedown', (e) => { keys[btn.key] = true; });
+                    el.addEventListener('mouseup', (e) => { keys[btn.key] = false; });
+                    el.addEventListener('mouseleave', (e) => { keys[btn.key] = false; });
+                }
+            });
+        }
+
+        function handleMovement() {
+            // Don't move if modal is open
+            if(document.getElementById('modal-quiz').style.display === 'flex') {
+                keys.w = keys.a = keys.s = keys.d = false;
+                return;
+            }
+
+            let dx = 0;
+            let dz = 0;
+
+            if(keys.w) dz -= 1;
+            if(keys.s) dz += 1;
+            if(keys.a) dx -= 1;
+            if(keys.d) dx += 1;
+
+            // Normalize diagonal speed
+            if(dx !== 0 && dz !== 0) {
+                const len = Math.sqrt(dx*dx + dz*dz);
+                dx /= len;
+                dz /= len;
+            }
+
+            if(dx !== 0 || dz !== 0) {
+                player.position.x += dx * playerSpeed;
+                player.position.z += dz * playerSpeed;
+                
+                // Simple bobbing animation
+                const time = Date.now() * 0.01;
+                player.children[0].position.y = 0.75 + Math.abs(Math.sin(time)) * 0.2; // Body
+                player.children[1].position.y = 2 + Math.abs(Math.sin(time)) * 0.2; // Head
+                
+                // Facing direction
+                const targetAngle = Math.atan2(dx, dz);
+                player.rotation.y = targetAngle;
+                
+                // Boundaries
+                player.position.x = Math.max(-45, Math.min(45, player.position.x));
+                player.position.z = Math.max(-45, Math.min(45, player.position.z));
+            } else {
+                player.children[0].position.y = 0.75;
+                player.children[1].position.y = 2;
+            }
+        }
+
+        function checkProximity() {
+            let foundStation = null;
+            
+            for(let st of stations) {
+                const dx = player.position.x - st.x;
+                const dz = player.position.z - st.z;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+                
+                if(dist < st.radius) {
+                    foundStation = st.id;
+                    // Mild highlight effect
+                    st.mesh.scale.set(1.05, 1.05, 1.05);
+                } else {
+                    st.mesh.scale.set(1, 1, 1);
+                }
+            }
+
+            const actionBtn = document.getElementById('action-btn-container');
+            
+            if(foundStation !== gameState.activeStationObj) {
+                gameState.activeStationObj = foundStation;
+                if(foundStation) {
+                    actionBtn.style.display = 'block';
+                } else {
+                    actionBtn.style.display = 'none';
+                }
+            }
+        }
+
+        function triggerCurrentStation() {
+            if(gameState.activeStationObj) {
+                startLevelQuiz(gameState.activeStationObj);
+                // Reset keys to prevent runaway movement after modal close
+                keys = { w: false, a: false, s: false, d: false };
+            }
+        }
+
+        function resize3D() {
+            if(!camera || !renderer) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            if(!gameState.in3DMode) {
+                requestAnimationFrame(animate);
+                return;
+            }
+
+            requestAnimationFrame(animate);
+            handleMovement();
+            checkProximity();
+            updateCamera();
+            renderer.render(scene, camera);
+        }
+
+        // --- 6. INITIALIZATION ---
+        window.onload = function() {
+            populateLevelMenu();
+            updateDashboard();
+            
+            // Handle fallback error if WebGL fails
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (!gl) {
+                    console.warn("WebGL not supported. 3D mode might fail.");
+                }
+            } catch(e) {
+                console.error("WebGL error:", e);
+            }
+        };
+
+    </script>
+</body>
+</html>
